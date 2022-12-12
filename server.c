@@ -210,10 +210,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			write(sock, "You should end the active session to begin another", 51);
 			return (0);
 		}
-        //strcpy(current->username, user_input + 14) //char *username = strdup(user_input + 14); //free
-        // printf("got the info, username is %s\n", user_input+14);
         find_user(server, user_input + 14, user_id);
-        // if (find_user(server, user_input + 14, user_id) == 1)
         for (int i = 0; i < server->user_count; ++i)
         {
             if (strcmp(server->users[i], user_input + 14) == 0)
@@ -221,30 +218,9 @@ int read_protocol(int sock, t_server *server, int *user_id)
                 char *response = concat_begin_message("You have ", server->number_of_messages[*user_id], " short messages");
 				write(sock, response, strlen(response) + 1);
 				free(response);
-                // char *ascii = itoa(server->number_of_messages[i]);
-                // write(sock, "You already logged in.\nYou have ", 33);
-                // write(socket, ascii, strlen(ascii));
-                // write(socket, " short messages", 14);
-                // free(ascii);
                 return 0;
             }
         }
-        // else
-        // {
-        //     for (int i = 0; i < server->user_count; ++i)
-        //     {
-        //         if (strcmp(server->users[i], user_input + 14) == 0)
-        //         {
-        //             concat_begin_message("You have ", server->number_of_messages[*user_id], " short messages");
-        //             // char *ascii = itoa(server->number_of_messages[i]);
-        //             write(sock, "You have ", 10);
-        //         //    write(socket, ascii, strlen(ascii));
-        //             // write(socket, " short messages", 14);
-        //             // free(ascii);
-        //             return 0;
-        //         }
-        //     }
-        // }
     }
     else if (strncmp(user_input, "SEND_MESSAGE ", 13) == 0)
     {

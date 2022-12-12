@@ -20,7 +20,6 @@ int main()
 	else
 	{
 		printf("Connected to the server successfully!\n");
-		// recv(net_socket, &response, sizeof(response), 0);
 		while (1)
 		{
 
