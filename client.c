@@ -94,6 +94,7 @@ void *display_incoming_message(void *param);
 
 void receiver(int signal)
 {
+	write(net_socket, "END_SESSION", 12);
 	close(net_socket);
 	exit(0);
 }

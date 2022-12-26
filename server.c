@@ -9,10 +9,13 @@
 #include <signal.h>
 #include <time.h>
 
+int server_socket;
+
 typedef struct s_messages
 {
     char message[256];
     char sending[32];
+    time_t raw_time;
     struct s_messages *next;
 }   t_messages;
 
@@ -24,10 +27,10 @@ typedef struct s_server
     int user_count;
     char **users;
     int *number_of_messages;
+    int *user_status;
+	int *user_fd;
     t_messages **messages;
 }   t_server;
-
-int server_socket;
 
 void print_users(char **users)
 {
@@ -38,6 +41,8 @@ void print_users(char **users)
         ++i;
     }
 }
+
+void send_pending_messages(t_server *server, int user_id, int fd);
 
 static int	ft_numlen(int n)
 {
@@ -145,6 +150,7 @@ int find_user(t_server *server, char *name, int *user_id)
         server->users[1] = NULL;
         server->number_of_messages = malloc(sizeof(int));
         server->number_of_messages[0] = 0;
+        server->user_status = malloc(sizeof(int));
         server->messages = malloc(sizeof(t_messages *));
         server->messages[0] = NULL;
         *user_id = 0;
@@ -183,6 +189,17 @@ int find_user(t_server *server, char *name, int *user_id)
         free(server->number_of_messages);
         tmpnum[server->user_count - 1] = 0;
         server->number_of_messages = tmpnum;
+
+        int n = 0;
+        int *tmp_status = malloc(sizeof(int) * server->user_count);
+        while (n < server->user_count - 1)
+        {
+            tmp_status[n] = server->user_status[n];
+            ++n;
+        }
+        tmp_status[n] = 1;
+        free(server->user_status);
+        server->user_status = tmp_status;
         t_messages **tmpmsg = malloc(sizeof(t_messages *) * (server->user_count));
         i = 0;
         while (i < server->user_count - 1)
@@ -215,14 +232,18 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			return (0);
 		}
         find_user(server, user_input + 14, user_id);
+        server->user_status[*user_id] = 1;
         write(sock, "Session Started\n", 17);
         for (int i = 0; i < server->user_count; ++i)
         {
             if (strcmp(server->users[i], user_input + 14) == 0)
             {
-                char *response = concat_begin_message("You have ", server->number_of_messages[*user_id], " short messages");
-				write(sock, response, strlen(response) + 1);
-				free(response);
+                if (server->number_of_messages[*user_id] == 0)
+                    write(sock, "You do not have any pending messages", 37);
+                else
+                {
+					send_pending_messages(server, *user_id, sock);
+				}
                 return 0;
             }
         }
@@ -250,6 +271,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
             strncpy(server->messages[send_id]->message, user_input + i + 14, 224);
             server->messages[send_id]->next = NULL;
             strcpy(server->messages[send_id]->sending, server->users[*user_id]);
+            time(&server->messages[send_id]->raw_time);
         }
         else
         {
@@ -260,9 +282,11 @@ int read_protocol(int sock, t_server *server, int *user_id)
             strncpy(current->next->message, user_input + i + 14, 224);
             current->next->next = NULL;
             strcpy(server->messages[send_id]->sending, server->users[*user_id]);
+            time(&current->next->raw_time);
         }
         ++server->number_of_messages[send_id];
         write(sock, "Your text message is received", 30);
+		send_pending_messages(server, *user_id, sock);
         return 0;
     }
     else if (strncmp(user_input, "GET_MESSAGE", 12) == 0)
@@ -295,6 +319,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			write(sock, "There is no active session to end", 34);
 			return (0);
 		}
+        server->user_status[*user_id] = 0;
         printf("Session ended\n");
         write(sock, "Session ended", 14);
         *user_id = -1;
@@ -324,6 +349,28 @@ void *client_service(void *param)
     return (NULL);
 }
 
+void send_pending_messages(t_server *server, int user_id, int fd)
+{
+    int i = 0;
+
+    while (i < server->user_count)
+    {
+        if (server->number_of_messages[i] > 0 && server->user_status[i] == 1)
+        {
+            t_messages *current = server->messages[i];
+            char *send_package;
+			while (current != NULL)
+			{
+				send_package = malloc(sizeof(char) * (12 + strlen(current->sending) + strlen(current->message)));
+				sprintf(send_package, "%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->sending, current->message);
+				write(fd, send_package, strlen(send_package) + 1);
+				free(send_package);
+				current = current->next;
+			}
+        }
+        ++i;
+    }
+}
 
 void receiver(int signal)
 {
