@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <signal.h>
+#include <time.h>
 
 typedef struct s_messages
 {
@@ -24,6 +26,8 @@ typedef struct s_server
     int *number_of_messages;
     t_messages **messages;
 }   t_server;
+
+int server_socket;
 
 void print_users(char **users)
 {
@@ -211,6 +215,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			return (0);
 		}
         find_user(server, user_input + 14, user_id);
+        write(sock, "Session Started\n", 17);
         for (int i = 0; i < server->user_count; ++i)
         {
             if (strcmp(server->users[i], user_input + 14) == 0)
@@ -319,9 +324,16 @@ void *client_service(void *param)
     return (NULL);
 }
 
+
+void receiver(int signal)
+{
+    close(server_socket);
+    exit(0);
+}
+
 int main()
 {
-    int server_socket; 
+    signal(SIGINT, &receiver);
     if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("Socket Error");
@@ -360,8 +372,6 @@ int main()
 		printf("New client has been connected\n");
         pthread_create(&tid, NULL, &client_service, &server);
     }
-
-    close(server_socket);
 
     return (0);
 }
