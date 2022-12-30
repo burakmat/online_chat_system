@@ -8,17 +8,20 @@
 #include <pthread.h>
 #include <fcntl.h>
 
+// net_socket is a global variable that will store the socket descriptor for the network connection
 int net_socket;
 
+// t_client is a struct that stores the display_tty of the client
 typedef struct s_client
 {
 	char *display_tty;
 }	t_client;
 
-
+// new_terminal creates a new terminal window and returns the tty of the new terminal window
 char *new_terminal()
 {
 	// Get the list of ttys before opening the terminal window
+	// The "ps -o tty,comm | grep zsh" command lists all of the ttys that are running zsh
 	FILE* fp = popen("ps -o tty,comm | grep zsh", "r");
 	if (fp == NULL) {
 		perror("Error: popen failed");
@@ -76,21 +79,26 @@ char *new_terminal()
 
 	printf("tty_str: %s\n", tty_str);
 
-	// Return the tty string
 	return tty_str;
 }
 
+// create_tty_path creates a path string for the given tty
 char *create_tty_path(char* tty)
 {
+	// Allocate memory for the tty path string and create the string by concatenating "/dev/" and the tty
 	char* tty_string = malloc(strlen("/dev/") + strlen(tty) + 1);
 	sprintf(tty_string, "/dev/%s", tty);
+	// Free the memory allocated for the tty string
 	free(tty);
 	return tty_string;
 }
 
-
+// display_incoming_message is a function that is executed by a separate thread
+// It will display incoming messages from the server on the terminal window
 void *display_incoming_message(void *param);
 
+// receiver is a function that is called when the program receives a SIGINT signal (Ctrl+C)
+// It sends an "END_SESSION" message to the server and closes the network socket, tty, and stdout
 void receiver(int signal)
 {
 	write(net_socket, "END_SESSION", 12);
@@ -101,28 +109,37 @@ void receiver(int signal)
 
 int main()
 {
+	// request is a buffer to store user input
 	char request[256];
+	// tid is a thread identifier for the display_incoming_message thread
 	pthread_t tid;
+	// client is a t_client struct to store the display_tty of the client
 	t_client client;
+	// Create the network socket
 	net_socket = socket(AF_INET, SOCK_STREAM, 0);
+	// Set the receiver function to be called when the program receives a SIGINT signal
 	signal(SIGINT, &receiver);
 
+	// Set up the server address to connect to
 	struct sockaddr_in server_address;
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(9002);
 	server_address.sin_addr.s_addr = INADDR_ANY;
 
+	// Connect to the server
 	int status = connect(net_socket, (struct sockaddr *)&server_address, sizeof(server_address));
 	if (status == -1)
 		printf("Connection error!\n");
 	else
 	{
 		printf("Connected to the server successfully!\n");
+		// Create a new terminal window and store the tty in the client struct
 		char *tty = new_terminal();
 		if (tty == NULL)
 			return (1);
 		client.display_tty = create_tty_path(tty);
-		pthread_create(&tid, NULL, &display_incoming_message, &client);// add argument
+		pthread_create(&tid, NULL, &display_incoming_message, &client);
+		// Read user input and send it to the server
 		while (1)
 		{
 			read(0, request, 256);
@@ -166,6 +183,7 @@ void *display_incoming_message(void *param)
 	int i;
 
 	write(fd, "\n", 1);
+	// Read server output and send it to the opened terminal
 	while (1)
 	{
 		i = read(net_socket, message, 256);
