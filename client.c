@@ -166,6 +166,7 @@ void *display_incoming_message(void *param)
 	int fd = open(client->display_tty, O_WRONLY);
 	int i;
 
+	write(fd, "\n", 1);
 	while (1)
 	{
 		i = read(net_socket, message, 256);
