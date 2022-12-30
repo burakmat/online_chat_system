@@ -42,7 +42,7 @@ void print_users(char **users)
 	}
 }
 
-void send_pending_messages(t_server *server, int user_id);
+void send_pending_messages(t_server *server, int user_id, int first);
 void start_send_pending_messages(t_server *server, int user_id);
 
 static int	ft_numlen(int n)
@@ -258,8 +258,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
 				}
 				else
 				{
-					printf("user logged in, there is message\n");
-					start_send_pending_messages(server, *user_id);
+					send_pending_messages(server, *user_id, 1);
 				}
 				return 0;
 			}
@@ -303,7 +302,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
 		}
 		++server->number_of_messages[send_id];
 		write(sock, "Your text message is received", 30);
-		send_pending_messages(server, *user_id);
+		send_pending_messages(server, *user_id, 0);
 		return 0;
 	}
 	else if (strncmp(user_input, "GET_MESSAGE", 12) == 0)
@@ -366,10 +365,11 @@ void *client_service(void *param)
 	return (NULL);
 }
 
-void send_pending_messages(t_server *server, int user_id)
+void send_pending_messages(t_server *server, int user_id, int first)
 {
 	int i = 0;
 
+	printf("deneme1\n");
 	while (i < server->user_count)
 	{
 		if (server->number_of_messages[i] > 0 && server->user_status[i] == 1)
@@ -378,15 +378,31 @@ void send_pending_messages(t_server *server, int user_id)
 			char *send_package;
 			while (current != NULL)
 			{
-				send_package = malloc(sizeof(char) * (12 + strlen(current->sending) + strlen(current->message)));
-				sprintf(send_package, "%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->sending, current->message);
+				if (first)
+				{
+					send_package = malloc(sizeof(char) * (28 + strlen(current->sending) + strlen(current->message)));
+					sprintf(send_package, "Session Started\n%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->sending, current->message);
+					first = 0;
+				}
+				else
+				{
+					send_package = malloc(sizeof(char) * (12 + strlen(current->sending) + strlen(current->message)));
+					sprintf(send_package, "%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->sending, current->message);
+				}
+
 				write(server->user_fd[i], send_package, strlen(send_package) + 1);
 				free(send_package);
-				current = current->next;
+				server->messages[i] = current->next;
+				printf("inner\n");
+				free(current);
+				current = server->messages[i];
+				printf("end of outer if\n");
 			}
+			server->number_of_messages[i] = 0;
 		}
 		++i;
 	}
+	printf("deneme2\n");
 }
 
 void start_send_pending_messages(t_server *server, int user_id)
