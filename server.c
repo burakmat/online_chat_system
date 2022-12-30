@@ -32,6 +32,9 @@ typedef struct s_server
 	t_messages **messages;
 }   t_server;
 
+void send_pending_messages(t_server *server, int user_id, int first);
+char *receive_confirm(char *name, char *msg);
+
 void print_users(char **users)
 {
 	int i = 0;
@@ -41,8 +44,6 @@ void print_users(char **users)
 		++i;
 	}
 }
-
-void send_pending_messages(t_server *server, int user_id, int first);
 
 static int	ft_numlen(int n)
 {
@@ -302,8 +303,10 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			time(&current->next->raw_time);
 		}
 		++server->number_of_messages[send_id];
-		write(sock, "Your text message is received", 30);
+		char *confirm = receive_confirm(to_send, user_input + i + 14);
+		write(sock, confirm, strlen(confirm) + 1);
 		send_pending_messages(server, *user_id, 0);
+		free(confirm);
 		return 0;
 	}
 	else if (strncmp(user_input, "GET_MESSAGE", 12) == 0)
@@ -362,6 +365,15 @@ void *client_service(void *param)
 	}    
 	close(client_socket);
 	return (NULL);
+}
+
+char *receive_confirm(char *name, char *msg)
+{
+	int name_len = strlen(name);
+	int msg_len = strlen(msg);
+	char *message = malloc(sizeof(char) * (name_len + msg_len + 19));
+	sprintf(message, "Message sent to %s: %s", name, msg);
+	return (message);
 }
 
 void send_pending_messages(t_server *server, int user_id, int first)
