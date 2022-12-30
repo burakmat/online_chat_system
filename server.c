@@ -14,7 +14,7 @@ int server_socket;
 typedef struct s_messages
 {
 	char message[256];
-	char sending[32];
+	char from[32];
 	time_t raw_time;
 	struct s_messages *next;
 }   t_messages;
@@ -43,7 +43,6 @@ void print_users(char **users)
 }
 
 void send_pending_messages(t_server *server, int user_id, int first);
-void start_send_pending_messages(t_server *server, int user_id);
 
 static int	ft_numlen(int n)
 {
@@ -286,7 +285,8 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			server->messages[send_id] = malloc(sizeof(t_messages));
 			strncpy(server->messages[send_id]->message, user_input + i + 14, 224);
 			server->messages[send_id]->next = NULL;
-			strcpy(server->messages[send_id]->sending, server->users[*user_id]);
+			strcpy(server->messages[send_id]->from, server->users[*user_id]);
+			// printf("first message sent by %s\n", server->messages[send_id]->from);
 			time(&server->messages[send_id]->raw_time);
 		}
 		else
@@ -297,7 +297,8 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			current->next = malloc(sizeof(t_messages));
 			strncpy(current->next->message, user_input + i + 14, 224);
 			current->next->next = NULL;
-			strcpy(server->messages[send_id]->sending, server->users[*user_id]);
+			strcpy(current->next->from, server->users[*user_id]);
+			// printf("sent by %s\n", server->messages[send_id]->from);
 			time(&current->next->raw_time);
 		}
 		++server->number_of_messages[send_id];
@@ -319,7 +320,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
 		else
 		{
 			t_messages *current;
-			char *response = concat_get_message(server->messages[*user_id]->sending, server->messages[*user_id]->message);
+			char *response = concat_get_message(server->messages[*user_id]->from, server->messages[*user_id]->message);
 			write(sock, response, strlen(response) + 1);
 			free(response);
 			--server->number_of_messages[*user_id];
@@ -336,14 +337,12 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			return (0);
 		}
 		server->user_status[*user_id] = 0;
-		printf("Session ended\n");
 		write(sock, "Session ended", 14);
 		*user_id = -1;
 		return 0;
 	}
 	else
 	{
-		printf("Invalid request\n");
 		write(sock, "Message Not Understood", 23);
 		return 0;
 	}
@@ -369,7 +368,6 @@ void send_pending_messages(t_server *server, int user_id, int first)
 {
 	int i = 0;
 
-	printf("deneme1\n");
 	while (i < server->user_count)
 	{
 		if (server->number_of_messages[i] > 0 && server->user_status[i] == 1)
@@ -378,51 +376,26 @@ void send_pending_messages(t_server *server, int user_id, int first)
 			char *send_package;
 			while (current != NULL)
 			{
+				usleep(500);
 				if (first)
 				{
-					send_package = malloc(sizeof(char) * (28 + strlen(current->sending) + strlen(current->message)));
-					sprintf(send_package, "Session Started\n%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->sending, current->message);
+					send_package = malloc(sizeof(char) * (28 + strlen(current->from) + strlen(current->message)));
+					sprintf(send_package, "Session Started\n%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->from, current->message);
 					first = 0;
 				}
 				else
 				{
-					send_package = malloc(sizeof(char) * (12 + strlen(current->sending) + strlen(current->message)));
-					sprintf(send_package, "%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->sending, current->message);
+					send_package = malloc(sizeof(char) * (12 + strlen(current->from) + strlen(current->message)));
+					sprintf(send_package, "%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->from, current->message);
 				}
 
 				write(server->user_fd[i], send_package, strlen(send_package) + 1);
 				free(send_package);
-				server->messages[i] = current->next;
-				printf("inner\n");
+				server->messages[i] = server->messages[i]->next;
 				free(current);
 				current = server->messages[i];
-				printf("end of outer if\n");
 			}
 			server->number_of_messages[i] = 0;
-		}
-		++i;
-	}
-	printf("deneme2\n");
-}
-
-void start_send_pending_messages(t_server *server, int user_id)
-{
-	int i = 0;
-
-	while (i < server->user_count)
-	{
-		if (server->number_of_messages[i] > 0 && server->user_status[i] == 1)
-		{
-			t_messages *current = server->messages[i];
-			char *send_package;
-			while (current != NULL)
-			{
-				send_package = malloc(sizeof(char) * (28 + strlen(current->sending) + strlen(current->message)));
-				sprintf(send_package, "Session Started\n%02d:%02d:%02d-%s: %s", localtime(&current->raw_time)->tm_hour, localtime(&current->raw_time)->tm_min, localtime(&current->raw_time)->tm_sec, current->sending, current->message);
-				write(server->user_fd[i], send_package, strlen(send_package) + 1);
-				free(send_package);
-				current = current->next;
-			}
 		}
 		++i;
 	}

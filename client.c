@@ -96,6 +96,7 @@ void receiver(int signal)
 {
 	write(net_socket, "END_SESSION", 12);
 	close(net_socket);
+	close(1);
 	exit(0);
 }
 
@@ -150,7 +151,6 @@ char* concat_strings(const char* str1, const char* str2, const char* str3) {
     }
 
     // Concatenate the strings
-
     strcpy(result, str1);
     strcat(result, str2);
     strcat(result, str3);
@@ -170,7 +170,9 @@ void *display_incoming_message(void *param)
 	while (1)
 	{
 		i = read(net_socket, message, 256);
-		if (i == 0)
+		if (i == -1)
+			break ;
+		else if (i == 0)
 		{
 			write(1, "Server connection lost\n", 24);
 			write(fd, "Server connection lost\n", 24);
@@ -180,7 +182,7 @@ void *display_incoming_message(void *param)
 		i = strlen(message);
 		message[i] = '\n';
 		message[i + 1] = '\0';
-		printf("what i sent: %s\n", message);
 		write(fd, message, strlen(message) + 1);
 	}
+	return (NULL);
 }
