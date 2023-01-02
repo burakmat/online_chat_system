@@ -1,0 +1,6 @@
+.vscode/
+*.out
+.DS_Store
+server
+client
+*test*
