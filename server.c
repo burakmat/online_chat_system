@@ -369,7 +369,7 @@ int main()
 	}
 
 	// Start listening for incoming connections
-	listen(server_socket, 10);
+	listen(server_socket, 20);
 
 	// Declare variables for the client socket, thread identifier, and t_server struct
 	int client_socket;
