@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <fcntl.h>
+#include <sys/utsname.h>
 
 // net_socket is a global variable that will store the socket descriptor for the network connection
 int net_socket;
@@ -17,13 +18,14 @@ typedef struct s_client
 	char *display_tty;
 }	t_client;
 
-// new_terminal creates a new terminal window and returns the tty of the new terminal window
-char *new_terminal()
+// new_terminal_macOS creates a new terminal window and returns the tty of the new terminal window
+char *new_terminal_macOS()
 {
 	// Get the list of ttys before opening the terminal window
 	// The "ps -o tty,comm | grep zsh" command lists all of the ttys that are running zsh
 	FILE* fp = popen("ps -o tty,comm | grep zsh", "r");
-	if (fp == NULL) {
+	if (fp == NULL)
+	{
 		perror("Error: popen failed");
 		return NULL;
 	}
@@ -82,6 +84,61 @@ char *new_terminal()
 	return tty_str;
 }
 
+char *new_terminal_linux()
+{
+	FILE* fp = popen("ps a -o tty,comm | grep bash", "r");
+	if (fp == NULL)
+	{
+		perror("Error: popen failed");
+		return NULL;
+	}
+	int num_tasks = 0;
+	char ttys[256][256];
+	char line[256];
+	while (fgets(line, sizeof(line), fp) != NULL)
+	{
+		sscanf(line, "%s", ttys[num_tasks]);
+		++num_tasks;
+	}
+	pclose(fp);
+
+	system("gnome-terminal");
+
+	sleep(1);
+
+	fp = popen("ps a -o tty,comm | grep bash", "r");
+	if (fp == NULL)
+	{
+		perror("Error: popen failed");
+		return NULL;
+	}
+	char tty[256];
+	while (fgets(line, sizeof(line), fp) != NULL)
+	{
+		sscanf(line, "%s", tty);
+		int found = 0;
+		for (int i = 0; i < num_tasks; i++)
+		{
+			if (strcmp(ttys[i], tty) == 0)
+			{
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+		{
+			// The tty is the terminal window that was opened by the C program
+			break;
+		}
+	}
+	pclose(fp);
+
+	char *tty_str = malloc(strlen(tty) + 1);
+	strcpy(tty_str, tty);
+
+	return tty_str;
+}
+
 // create_tty_path creates a path string for the given tty
 char *create_tty_path(char* tty)
 {
@@ -115,6 +172,11 @@ int main()
 	pthread_t tid;
 	// client is a t_client struct to store the display_tty of the client
 	t_client client;
+
+	// Get system info to open suitable terminal
+	struct utsname sys_info;
+	uname(&sys_info);
+
 	// Create the network socket
 	net_socket = socket(AF_INET, SOCK_STREAM, 0);
 	// Set the receiver function to be called when the program receives a SIGINT signal
@@ -134,7 +196,13 @@ int main()
 	{
 		printf("Connected to the server successfully!\n");
 		// Create a new terminal window and store the tty in the client struct
-		char *tty = new_terminal();
+		char *tty;
+		// Open Terminal app on macOS
+		if (strcmp(sys_info.sysname, "Darwin") == 0)
+			tty = new_terminal_macOS();
+		// Open gnome-terminal on Linux
+		else if (strcmp(sys_info.sysname, "Linux") == 0)
+			tty = new_terminal_linux();
 		if (tty == NULL)
 			return (1);
 		client.display_tty = create_tty_path(tty);
