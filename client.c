@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <sys/utsname.h>
+#include <signal.h>
 
 // net_socket is a global variable that will store the socket descriptor for the network connection
 int net_socket;
