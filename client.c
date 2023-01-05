@@ -80,8 +80,6 @@ char *new_terminal_macOS()
 	char *tty_str = malloc(strlen(tty) + 1);
 	strcpy(tty_str, tty);
 
-	printf("tty_str: %s\n", tty_str);
-
 	return tty_str;
 }
 
