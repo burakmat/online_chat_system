@@ -67,6 +67,17 @@ After you start your session, you will receive any pending messages if there are
 
 >You can end your session using the `END_SESSION` command. This command does not take any arguments. After using this command, you will not receive any messages until you are online again. However, your messages will still be stored by the server while you are away.
 
+Here are some real examples:
+
+![ObiWan terminal 1](https://github.com/burakmat/online_chat_system/blob/master/images/obiwan_terminal_1.png)
+
+![ObiWan terminal 2](https://github.com/burakmat/online_chat_system/blob/master/images/obiwan_terminal_2.png)
+
+![Grievous terminal 1](https://github.com/burakmat/online_chat_system/blob/master/images/grievous_terminal_1.png)
+
+![Grievous terminal 2](https://github.com/burakmat/online_chat_system/blob/master/images/grievous_terminal_2.png)
+
+
 ## Design Guide
 
 This design guide outlines the architecture and implementation of a client-server based program. The program allows multiple clients to connect to a server and communicate with each other through the server. The server handles the communication between clients by storing and forwarding messages using a linked list data structure. The client establishes a connection to the server, sends and receives messages, and displays them in real-time using a suitable terminal program.
