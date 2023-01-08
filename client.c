@@ -53,7 +53,8 @@ char *new_terminal_macOS()
 		perror("Error: popen failed");
 		return NULL;
 	}
-	char tty[256]; // Name of the tty
+	// Name of the tty
+	char tty[256];
 	while (fgets(line, sizeof(line), fp) != NULL)
 	{
 		sscanf(line, "%s", tty);
@@ -76,7 +77,6 @@ char *new_terminal_macOS()
 	}
 	pclose(fp);
 
-	// printf("The tty of the terminal window is: %s\n", tty);
 	char *tty_str = malloc(strlen(tty) + 1);
 	strcpy(tty_str, tty);
 
@@ -219,28 +219,6 @@ int main()
 	}
 	return (0);
 }
-
-char* concat_strings(const char* str1, const char* str2, const char* str3) {
-	// Calculate the length of the resulting string
-	size_t len1 = strlen(str1);
-	size_t len2 = strlen(str2);
-	size_t len3 = strlen(str3);
-	size_t len = len1 + len2 + len3 + 1; // +1 for the null-terminating character
-
-	// Allocate memory for the resulting string
-	char* result = malloc(len);
-	if (result == NULL) {
-		return NULL; // Error: malloc failed
-	}
-
-	// Concatenate the strings
-	strcpy(result, str1);
-	strcat(result, str2);
-	strcat(result, str3);
-
-	return result;
-}
-
 
 void *display_incoming_message(void *param)
 {
