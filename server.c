@@ -155,8 +155,11 @@ int read_protocol(int sock, t_server *server, int *user_id)
 {
 	char user_input[256];
 	int buff = read(sock, user_input, 256);
+	// Checking whether client side exit with interrupt signal
 	if (buff <= 0)
 	{
+		if (*user_id != -1)
+			server->user_status[*user_id] = 0;
 		printf("Client disconnected\n");
 		return (1);
 	}
@@ -170,7 +173,13 @@ int read_protocol(int sock, t_server *server, int *user_id)
 			return (0);
 		}
 		// Find the user's id and set their status to active
-		find_user(server, user_input + 14, user_id);
+		if (find_user(server, user_input + 14, user_id) && server->user_status[*user_id] == 1)
+		{
+			// Do not let user to login if the user has already an active session
+			write(sock, "This user already have an active session", 41);
+			*user_id = -1;
+			return (0);
+		}
 		server->user_status[*user_id] = 1;
 		server->user_fd[*user_id] = sock;
 		for (int i = 0; i < server->user_count; ++i)
@@ -247,8 +256,7 @@ int read_protocol(int sock, t_server *server, int *user_id)
 		// Set the user's status to offline and close their socket
 		server->user_status[*user_id] = 0;
 		write(sock, "Session ended", 14);
-		*user_id = -1;
-		return 0;
+		return 1;
 	}
 	else
 	{

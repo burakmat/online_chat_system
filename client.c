@@ -10,14 +10,15 @@
 #include <sys/utsname.h>
 #include <signal.h>
 
-// net_socket is a global variable that will store the socket descriptor for the network connection
-int net_socket;
-
 // t_client is a struct that stores the display_tty of the client
 typedef struct s_client
 {
 	char *display_tty;
+	int display_fd;
+	int net_socket;
 }	t_client;
+
+t_client client;
 
 // new_terminal_macOS creates a new terminal window and returns the tty of the new terminal window
 char *new_terminal_macOS()
@@ -151,15 +152,46 @@ char *create_tty_path(char* tty)
 
 // display_incoming_message is a function that is executed by a separate thread
 // It will display incoming messages from the server on the terminal window
-void *display_incoming_message(void *param);
+void *display_incoming_message(void *param)
+{
+	char message[512];
+	client.display_fd = open(client.display_tty, O_WRONLY);
+	int i;
+
+	write(client.display_fd, "\n", 1);
+	// Read server output and send it to the opened terminal
+	while (1)
+	{
+		i = read(client.net_socket, message, 256);
+		if (i == -1)
+			break ;
+		else if (i == 0)
+		{
+			write(client.display_fd, "Server connection lost\n", 24);
+			close(client.net_socket);
+			exit(0);
+		}
+		i = strlen(message);
+		message[i] = '\n';
+		message[i + 1] = '\0';
+		write(client.display_fd, message, strlen(message) + 1);
+		if (strcmp(message, "Session ended\n") == 0)
+		{
+			close(client.net_socket);
+			close(client.display_fd);
+			exit(0);
+		}
+	}
+	return (NULL);
+}
 
 // receiver is a function that is called when the program receives a SIGINT signal (Ctrl+C)
 // It sends an "END_SESSION" message to the server and closes the network socket, tty, and stdout
 void receiver(int signal)
 {
-	write(net_socket, "END_SESSION", 12);
-	close(net_socket);
-	close(1);
+	close(client.net_socket);
+	write(client.display_fd, "Session ended\n", 15);
+	close(client.display_fd);
 	exit(0);
 }
 
@@ -169,15 +201,13 @@ int main()
 	char request[256];
 	// tid is a thread identifier for the display_incoming_message thread
 	pthread_t tid;
-	// client is a t_client struct to store the display_tty of the client
-	t_client client;
 
 	// Get system info to open suitable terminal
 	struct utsname sys_info;
 	uname(&sys_info);
 
 	// Create the network socket
-	net_socket = socket(AF_INET, SOCK_STREAM, 0);
+	client.net_socket = socket(AF_INET, SOCK_STREAM, 0);
 	// Set the receiver function to be called when the program receives a SIGINT signal
 	signal(SIGINT, &receiver);
 
@@ -188,7 +218,7 @@ int main()
 	server_address.sin_addr.s_addr = INADDR_ANY;
 
 	// Connect to the server
-	int status = connect(net_socket, (struct sockaddr *)&server_address, sizeof(server_address));
+	int status = connect(client.net_socket, (struct sockaddr *)&server_address, sizeof(server_address));
 	if (status == -1)
 		printf("Connection error!\n");
 	else
@@ -211,40 +241,12 @@ int main()
 		{
 			read(0, request, 256);
 			int i = 0;
+			// Remove newline from the line end
 			while (request[i] != '\n')
 				++i;
 			request[i] = '\0';
-			write(net_socket, request, 256);
+			write(client.net_socket, request, 256);
 		}
 	}
 	return (0);
-}
-
-void *display_incoming_message(void *param)
-{
-	t_client *client = (t_client *)param;
-	char message[512];
-	int fd = open(client->display_tty, O_WRONLY);
-	int i;
-
-	write(fd, "\n", 1);
-	// Read server output and send it to the opened terminal
-	while (1)
-	{
-		i = read(net_socket, message, 256);
-		if (i == -1)
-			break ;
-		else if (i == 0)
-		{
-			write(1, "Server connection lost\n", 24);
-			write(fd, "Server connection lost\n", 24);
-			close(net_socket);
-			exit(0);
-		}
-		i = strlen(message);
-		message[i] = '\n';
-		message[i + 1] = '\0';
-		write(fd, message, strlen(message) + 1);
-	}
-	return (NULL);
 }
